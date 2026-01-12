@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react"; 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import React, { useEffect, useState, useRef } from "react"; 
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import { useNavigate } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import MapHeader from "./MapHeader";
-import customPin from "../../assets/wind-power.png"; // <-- your pin
+import customPin from "../../assets/wind-power.png";
 
 // Fix default Leaflet marker icons in React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -12,11 +12,26 @@ delete L.Icon.Default.prototype._getIconUrl;
 const customIcon = new L.Icon({
   iconUrl: customPin,
   iconRetinaUrl: customPin,
-  iconSize: [32, 32], // adjust to desired size
-  iconAnchor: [16, 32], // anchor point (middle bottom)
-  popupAnchor: [0, -32], // popup relative to icon
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
   shadowUrl: null,
 });
+
+// Smoothly fly to a position
+function MapFlyTo({ position, zoom }) {
+  const map = useMap();
+  const prevPos = useRef(null);
+
+  useEffect(() => {
+    if (position && (prevPos.current === null || prevPos.current.toString() !== position.toString())) {
+      map.flyTo(position, zoom, { duration: 0.5 });
+      prevPos.current = position;
+    }
+  }, [position, zoom, map]);
+
+  return null;
+}
 
 export default function MapPage() {
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -26,7 +41,15 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // debounce typing
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search), 500);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // fetch turbine data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -65,24 +88,32 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // filter turbines based on debounced search
   const filteredTurbines = turbines.filter((t) => {
-    const nameMatch = (deviceMap[t.id] || "").toLowerCase().includes(search.toLowerCase());
-    const idMatch = t.id.toString().toLowerCase().includes(search.toLowerCase());
+    const nameMatch = (deviceMap[t.id] || "")
+      .toLowerCase()
+      .includes(debouncedSearch.toLowerCase());
+    const idMatch = t.id.toString().toLowerCase().includes(debouncedSearch.toLowerCase());
     return nameMatch || idMatch;
   });
 
-  const mapCenter =
-    filteredTurbines.length > 0
+  // only snap to first match if debounced search is not empty
+  const firstMatchPos =
+    debouncedSearch && filteredTurbines.length > 0
+      ? [filteredTurbines[0].latitude, filteredTurbines[0].longitude]
+      : null;
+
+  // default center
+  const defaultCenter =
+    turbines.length > 0
       ? [
-          filteredTurbines.reduce((sum, t) => sum + t.latitude, 0) / filteredTurbines.length,
-          filteredTurbines.reduce((sum, t) => sum + t.longitude, 0) / filteredTurbines.length,
+          turbines.reduce((sum, t) => sum + t.latitude, 0) / turbines.length,
+          turbines.reduce((sum, t) => sum + t.longitude, 0) / turbines.length,
         ]
       : [12.122, -68.905];
 
   const handleMarkerClick = (turbineId) => {
-    if (window.innerWidth >= 768) {
-      navigate(`/turbinedetails/${turbineId}`);
-    }
+    if (window.innerWidth >= 768) navigate(`/turbinedetails/${turbineId}`);
   };
 
   const handleViewDetailsClick = (turbineId) => {
@@ -94,11 +125,13 @@ export default function MapPage() {
       <MapHeader search={search} setSearch={setSearch} />
 
       <main className="flex-grow h-[calc(100vh-64px)]">
-        <MapContainer center={mapCenter} zoom={12} scrollWheelZoom={true} className="w-full h-full">
+        <MapContainer center={defaultCenter} zoom={12} scrollWheelZoom className="w-full h-full">
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
           />
+
+          {firstMatchPos && <MapFlyTo position={firstMatchPos} zoom={16} />}
 
           {loading && <div>Loading turbines...</div>}
           {error && <div className="text-red-500">{error}</div>}
@@ -109,7 +142,7 @@ export default function MapPage() {
               <Marker
                 key={turbine.id}
                 position={[turbine.latitude, turbine.longitude]}
-                icon={customIcon} // <-- use custom pin here
+                icon={customIcon}
                 eventHandlers={{
                   click: () => handleMarkerClick(turbine.id),
                   mouseover: (e) => e.target.openPopup(),
