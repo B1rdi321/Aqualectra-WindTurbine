@@ -12,6 +12,7 @@ import {
 ChartJS.register(LinearScale, CategoryScale, PointElement, LineElement, Filler);
 
 export default function TurbinesAtRiskCard() {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   const [turbines, setTurbines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openTurbine, setOpenTurbine] = useState(null);
@@ -20,7 +21,7 @@ export default function TurbinesAtRiskCard() {
   useEffect(() => {
     const fetchTurbines = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/turbines-risk");
+        const res = await fetch(`${API_BASE_URL}/api/turbines-risk`);
         const data = await res.json();
         setTurbines(data.turbinesAtRisk || []);
       } catch (err) {
