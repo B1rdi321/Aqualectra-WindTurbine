@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { getLocalDateString } from "../../../utils/turbineUtils";
 
 export default function useTurbineData(id, selectedDate) {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   const [details, setDetails] = useState(null);
   const [deviceMap, setDeviceMap] = useState({});
   const [turbineList, setTurbineList] = useState([]);
@@ -20,8 +21,8 @@ export default function useTurbineData(id, selectedDate) {
     (async () => {
       try {
         const [devRes, turRes] = await Promise.all([
-          fetch("http://localhost:5000/api/greenbyte/turbines/devices"),
-          fetch("http://localhost:5000/api/greenbyte/turbines"),
+          fetch(`${API_BASE_URL}/api/greenbyte/turbines/devices`),
+          fetch(`${API_BASE_URL}/api/greenbyte/turbines`),
         ]);
         setDeviceMap(await devRes.json());
         setTurbineList(await turRes.json());
@@ -38,7 +39,7 @@ export default function useTurbineData(id, selectedDate) {
     const fetchDetails = async () => {
       try {
         const timestamp = new Date().toISOString(); // frontend timestamp
-        const url = `http://localhost:5000/api/greenbyte/turbines/${id}/details?date=${fetchDate}&timestamp=${timestamp}`;
+        const url = `${API_BASE_URL}/api/greenbyte/turbines/${id}/details?date=${fetchDate}&timestamp=${timestamp}`;
 
         console.log("🌐 Fetching turbine details from:", url);
 
