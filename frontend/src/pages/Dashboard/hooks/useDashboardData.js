@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
  */
 
 export default function useDashboardData(filters) {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   const [turbines, setTurbines] = useState([]);
   const lastTurbinesRef = useRef([]);
 
@@ -83,7 +84,7 @@ export default function useDashboardData(filters) {
         if (activeFilters?.location) params.append("location", activeFilters.location);
         if (activeFilters?.devices?.length > 0) params.append("devices", activeFilters.devices.join(","));
 
-        const url = `http://localhost:5000/api/greenbyte/turbines/all?${params.toString()}`;
+        const url = `${API_BASE_URL}/api/greenbyte/turbines/all?${params.toString()}`;
         console.log(`🌐 Fetching JSON from: %c${url}`, "color: blue; font-weight: bold");
 
         const data = await fetchWithRetry(url, 2, 500, controller.signal);
@@ -114,10 +115,10 @@ export default function useDashboardData(filters) {
         if (!Object.keys(deviceMap).length || !Object.keys(locationGroups).length) {
           const [devices, locs] = await Promise.all([
             !Object.keys(deviceMap).length
-              ? fetchWithRetry("http://localhost:5000/api/greenbyte/turbines/devices", 2, 500, controller.signal)
+              ? fetchWithRetry(`${API_BASE_URL}/api/greenbyte/turbines/devices`, 2, 500, controller.signal)
               : Promise.resolve(deviceMap),
             !Object.keys(locationGroups).length
-              ? fetchWithRetry("http://localhost:5000/api/location-groups", 2, 500, controller.signal)
+              ? fetchWithRetry(`${API_BASE_URL}/api/location-groups`, 2, 500, controller.signal)
               : Promise.resolve(locationGroups),
           ]);
           if (!Object.keys(deviceMap).length) {
