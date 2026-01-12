@@ -7,8 +7,8 @@ import { exportDashboardPDF, exportDashboardCSV } from "../../../utils/dashboard
 export default function DashboardHeader({ setMobileOpen, onMapClick, dashboardData }) {
   return (
     <header
-      className="flex justify-between items-center
-                 px-6 py-4
+      className="flex flex-col md:flex-row justify-between items-center
+                 px-4 md:px-6 py-4
                  bg-blue-100/20 backdrop-blur-xl
                  border-b border-blue-200/40
                  shadow-[0_8px_32px_rgba(0,123,255,0.1)]
@@ -20,7 +20,7 @@ export default function DashboardHeader({ setMobileOpen, onMapClick, dashboardDa
       }}
     >
       {/* Left: mobile menu + logo */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-4 w-full md:w-auto">
         {/* ☰ button for mobile */}
         <button
           className="md:hidden p-2 bg-blue-400 text-white rounded hover:bg-blue-500 transition"
@@ -36,7 +36,7 @@ export default function DashboardHeader({ setMobileOpen, onMapClick, dashboardDa
             <span className="text-xl font-medium text-blue-700 tracking-tight">
               Wind Dashboard
             </span>
-            <span className="text-sm text-gray-500 font-light">
+            <span className="text-sm text-gray-500 font-light hidden sm:inline">
               Real-time turbine data & forecasts
             </span>
           </div>
@@ -44,7 +44,7 @@ export default function DashboardHeader({ setMobileOpen, onMapClick, dashboardDa
       </div>
 
       {/* Right: export + map */}
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center space-x-4 mt-3 md:mt-0 w-full md:w-auto justify-start md:justify-end">
         {/* PDF Export Button */}
         <button
           className="flex flex-col items-center text-green-600 hover:text-green-800 transition transform hover:scale-110"
