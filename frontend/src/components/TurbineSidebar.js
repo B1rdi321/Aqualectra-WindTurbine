@@ -194,7 +194,10 @@ export default function TurbineSidebar({
                 </div>
 
                 <button
-                  onClick={handleApplyFilters}
+                  onClick={() => {
+                    handleApplyFilters(); // apply filters
+                    if (isMobile) setMobileOpen(false); // close sidebar on mobile
+                  }}
                   disabled={!!dateError}
                   className={`w-full px-3 py-1 text-sm text-white rounded-sm ${
                     dateError
