@@ -19,6 +19,7 @@ const customIcon = new L.Icon({
 });
 
 export default function MapPage() {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   const navigate = useNavigate();
   const [turbines, setTurbines] = useState([]);
   const [deviceMap, setDeviceMap] = useState({});
@@ -29,7 +30,7 @@ export default function MapPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const resTurbines = await fetch("http://localhost:5000/api/greenbyte/turbines");
+        const resTurbines = await fetch(`${API_BASE_URL}/api/greenbyte/turbines`);
         if (!resTurbines.ok) throw new Error("Failed to fetch turbine data");
         const dataTurbines = await resTurbines.json();
 
@@ -50,7 +51,7 @@ export default function MapPage() {
 
     const fetchDeviceMap = async () => {
       try {
-        const resMap = await fetch("http://localhost:5000/api/greenbyte/turbines/devices");
+        const resMap = await fetch(`${API_BASE_URL}/api/greenbyte/turbines/devices`);
         const map = await resMap.json();
         setDeviceMap(map);
       } catch (err) {
