@@ -42,6 +42,7 @@ export default function TurbineSidebar({
 
   const navigate = useNavigate();
 
+  // Detect mobile
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     handleResize();
@@ -49,6 +50,7 @@ export default function TurbineSidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Load collapsed state from localStorage
   useEffect(() => {
     const savedCollapsed = localStorage.getItem("sidebarCollapsed");
     if (savedCollapsed !== null) setCollapsed(savedCollapsed === "true");
@@ -57,6 +59,19 @@ export default function TurbineSidebar({
   useEffect(() => {
     localStorage.setItem("sidebarCollapsed", collapsed);
   }, [collapsed]);
+
+  // Prevent background scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isMobile && mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    // Clean up in case component unmounts
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, mobileOpen]);
 
   const expanded = isMobile ? mobileOpen : !collapsed;
   const sidebarWidth = expanded ? 256 : 64;
@@ -195,8 +210,8 @@ export default function TurbineSidebar({
 
                 <button
                   onClick={() => {
-                    handleApplyFilters(); // apply filters
-                    if (isMobile) setMobileOpen(false); // close sidebar on mobile
+                    handleApplyFilters();
+                    if (isMobile) setMobileOpen(false);
                   }}
                   disabled={!!dateError}
                   className={`w-full px-3 py-1 text-sm text-white rounded-sm ${
