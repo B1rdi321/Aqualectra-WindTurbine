@@ -62,7 +62,6 @@ export default function DashboardLineChart({
     if (!chartData) return [];
 
     if (!showPerTurbine) {
-      // Aggregated chart
       const filtered = chartData.labels
         .map((ts, i) => ({
           ts: new Date(ts),
@@ -130,7 +129,6 @@ export default function DashboardLineChart({
         },
       ];
     } else {
-      // Per-turbine chart
       const labels = chartData.labels || [];
       return Object.entries(chartData.turbines || {}).map(([tId, series], idx) => {
         const livePoints = series.live
@@ -152,7 +150,7 @@ export default function DashboardLineChart({
             fill: false,
             pointRadius: 2,
             pointStyle: "circle",
-            clip: false, // <-- ensure dots render above the line
+            clip: false,
           },
           {
             label: `Turbine ${tId} Forecast`,
@@ -165,7 +163,7 @@ export default function DashboardLineChart({
             borderDash: [5, 5],
             pointRadius: 2,
             pointStyle: "circle",
-            clip: false, // <-- ensure dots render above the line
+            clip: false,
           },
         ];
       }).flat();
@@ -221,13 +219,32 @@ export default function DashboardLineChart({
     <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-semibold text-lg">{showPerTurbine ? "Per-Turbine Chart" : "Aggregated Chart"}</h2>
-        <button
-          className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-500"
-          onClick={() => setShowPerTurbine(!showPerTurbine)}
-        >
-          {showPerTurbine ? "Show Aggregated" : "Show Per-Turbine"}
-        </button>
+
+        {/* Fixed Toggle Switch */}
+        <div className="flex items-center space-x-3">
+          <span className={`text-sm font-medium ${!showPerTurbine ? "text-gray-800" : "text-gray-400"}`}>
+            Aggregated
+          </span>
+
+          <div
+            className={`relative w-14 h-8 bg-gray-300 rounded-full cursor-pointer transition-all duration-300 ${
+              showPerTurbine ? "bg-indigo-600" : "bg-gray-300"
+            }`}
+            onClick={() => setShowPerTurbine(!showPerTurbine)}
+          >
+            <span
+              className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                showPerTurbine ? "translate-x-6" : "translate-x-0"
+              }`}
+            />
+          </div>
+
+          <span className={`text-sm font-medium ${showPerTurbine ? "text-gray-800" : "text-gray-400"}`}>
+            Per-Turbine
+          </span>
+        </div>
       </div>
+
       <div className="h-[480px]">
         <Line data={data} options={options} />
       </div>
