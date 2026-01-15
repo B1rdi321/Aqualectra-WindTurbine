@@ -1,15 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-/**
- * Expects filters.startDate and filters.endDate to be Date objects representing
- * local-day-aligned boundaries:
- *  - startDate: local 00:00:00 of the start day
- *  - endDate: local 23:59:59.999 of the end day
- *
- * fetchData will send ISO strings (UTC offsets included) to the backend,
- * but day logic / isLive checks are based on local Date objects.
- */
-
 export default function useDashboardData(filters) {
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   const [turbines, setTurbines] = useState([]);
@@ -29,6 +19,10 @@ export default function useDashboardData(filters) {
   const [lineChart, setLineChart] = useState({ labels: [], live: [], forecast: [], realtime: null });
   const lastLineChartRef = useRef({ labels: [], live: [], forecast: [], realtime: null });
 
+  // ✅ New state for per-turbine line chart
+  const [lineChartPerTurbine, setLineChartPerTurbine] = useState({ labels: [], turbines: {} });
+  const lastLineChartPerTurbineRef = useRef({ labels: [], turbines: {} });
+
   const [totalMWh, setTotalMWh] = useState(null);
   const lastTotalRef = useRef(null);
 
@@ -44,7 +38,6 @@ export default function useDashboardData(filters) {
   const abortControllerRef = useRef(null);
   const latestFetchIdRef = useRef(0);
 
-  // Retry helper
   const fetchWithRetry = async (url, retries = 2, delay = 500, signal) => {
     for (let i = 0; i <= retries; i++) {
       try {
@@ -111,7 +104,7 @@ export default function useDashboardData(filters) {
           .filter((ts) => ts instanceof Date && !isNaN(ts));
         setLastUpdated(timestamps.length ? new Date(Math.max(...timestamps.map((ts) => ts.getTime()))) : null);
 
-        // Fetch devices and location groups in parallel if not already loaded
+        // Fetch devices and location groups if not already loaded
         if (!Object.keys(deviceMap).length || !Object.keys(locationGroups).length) {
           const [devices, locs] = await Promise.all([
             !Object.keys(deviceMap).length
@@ -131,6 +124,7 @@ export default function useDashboardData(filters) {
           }
         }
 
+        // ---------------- Aggregated line chart ----------------
         const lineChartData = {
           labels: data.lineChart.labels.map((ts) => (ts ? new Date(ts) : null)),
           live: data.lineChart.live,
@@ -139,6 +133,14 @@ export default function useDashboardData(filters) {
         };
         setLineChart(lineChartData);
         lastLineChartRef.current = lineChartData;
+
+        // ---------------- Per-turbine line chart ----------------
+        const lineChartPerTurbineData = {
+          labels: data.lineChartPerTurbine.labels.map((ts) => (ts ? new Date(ts) : null)),
+          turbines: data.lineChartPerTurbine.turbines,
+        };
+        setLineChartPerTurbine(lineChartPerTurbineData);
+        lastLineChartPerTurbineRef.current = lineChartPerTurbineData;
 
         setTotalMWh(data.totalMWh);
         lastTotalRef.current = data.totalMWh;
@@ -180,6 +182,7 @@ export default function useDashboardData(filters) {
     forecastDayMWh,
     forecastNightMWh,
     lineChart,
+    lineChartPerTurbine, // ✅ new
     totalMWh,
     lowestTurbine,
     allTimeLowestTurbine,

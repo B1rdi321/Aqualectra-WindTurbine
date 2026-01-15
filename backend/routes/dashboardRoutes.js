@@ -100,6 +100,7 @@ router.get("/", async (req, res) => {
         forecastDayMWh: 0,
         forecastNightMWh: 0,
         lineChart: { labels: [], live: [], forecast: [] },
+        lineChartPerTurbine: { labels: [], turbines: {} },
         realtime: { timestamp: null, value: 0 },
         totalMWh: 0,
         lowestTurbine: null,
@@ -233,10 +234,8 @@ router.get("/", async (req, res) => {
     const forecastDayMWh = forecastDayKWh / 1000;
     const forecastNightMWh = forecastNightKWh / 1000;
 
-    // ---------------- Line chart ----------------
-    const hourlyLabels = [],
-      liveDataArray = [],
-      forecastDataArray = [];
+    // ---------------- Line chart (aggregated) ----------------
+    const hourlyLabels = [], liveDataArray = [], forecastDataArray = [];
     let lastLiveIndex = -1;
 
     for (let t = new Date(startOfDay); t <= endOfDay; t.setUTCHours(t.getUTCHours() + 1)) {
@@ -269,10 +268,49 @@ router.get("/", async (req, res) => {
       liveDataArray[i] = null;
     }
 
-    // ---------------- Realtime ----------------
-    let realtimeValue = 0,
-      realtimeTimestamp = null;
+    // ---------------- Per-turbine line chart ----------------
+    const perTurbineSeries = {};
+    activeIdsForData.forEach((id) => {
+      perTurbineSeries[id] = {
+        live: Array(hourlyLabels.length).fill(null),
+        forecast: Array(hourlyLabels.length).fill(0),
+      };
+    });
 
+    const perTurbineLineChartUrl =
+      `${process.env.BASE_URL}/data?deviceIds=${deviceQuery}&dataSignalIds=5,838` +
+      `&timestampStart=${startOfDay.toISOString()}` +
+      `&timestampEnd=${endOfDay.toISOString()}` +
+      `&useUtc=true&aggregate=device&aggregateLevel=0&calculation=sum&resolution=hourly`;
+
+    let rawPerTurbineLineData = [];
+    try {
+      rawPerTurbineLineData = await fetchWithRetry(perTurbineLineChartUrl, { headers }).catch(() => []);
+    } catch (err) {
+      console.warn("Per-turbine line chart fetch failed:", err?.message ?? err);
+    }
+
+    (rawPerTurbineLineData || []).forEach((device) => {
+      if (!device?.data || !device?.dataSignal) return;
+
+      const turbineId = device.aggregateId;
+      if (!perTurbineSeries[turbineId]) return;
+
+      const isLive = device.dataSignal.dataSignalId === 5;
+      const isForecast = device.dataSignal.dataSignalId === 838;
+
+      Object.entries(device.data).forEach(([ts, val]) => {
+        if (val == null) return;
+        const hourIndex = Math.floor((new Date(ts) - startOfDay) / (1000 * 60 * 60));
+        if (hourIndex < 0 || hourIndex >= hourlyLabels.length) return;
+
+        if (isLive) perTurbineSeries[turbineId].live[hourIndex] = val;
+        if (isForecast) perTurbineSeries[turbineId].forecast[hourIndex] += val;
+      });
+    });
+
+    // ---------------- Realtime ----------------
+    let realtimeValue = 0, realtimeTimestamp = null;
     (Array.isArray(realtimeData) ? realtimeData : []).forEach((item) => {
       if (!item?.data) return;
       const entries = Object.entries(item.data);
@@ -363,6 +401,10 @@ router.get("/", async (req, res) => {
         live: liveDataArray,
         forecast: forecastDataArray,
       },
+      lineChartPerTurbine: {
+        labels: hourlyLabels,
+        turbines: perTurbineSeries,
+      },
       realtime: { timestamp: realtimeTimestamp, value: realtimeValue },
       totalMWh,
       lowestTurbine,
@@ -372,6 +414,7 @@ router.get("/", async (req, res) => {
 
     if (!includesToday) setCache(cacheKey, response);
     return res.json(response);
+
   } catch (err) {
     console.error("🚨 Unified fetch failed:", err?.message ?? err);
     res.status(500).json({ error: "Failed to fetch unified turbine data." });

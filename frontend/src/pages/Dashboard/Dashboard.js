@@ -17,8 +17,9 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [selectedTurbines, setSelectedTurbines] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
-
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [showPerTurbine, setShowPerTurbine] = useState(false); // ✅ toggle
+
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
@@ -50,8 +51,10 @@ export default function Dashboard() {
     forecastDayMWh,
     forecastNightMWh,
     lineChart,
+    lineChartPerTurbine, // ✅ new
   } = dashboardData;
 
+  // ---------- Sync backend day ----------
   useEffect(() => {
     const serverNow = lineChart?.realtime?.timestamp ?? lastUpdated ?? null;
     if (!serverNow) return;
@@ -70,6 +73,7 @@ export default function Dashboard() {
     }
   }, [lastUpdated, lineChart]);
 
+  // ---------- Sync selected turbines with location ----------
   useEffect(() => {
     if (filters.location && selectedTurbines.length) {
       const allowedIds = locationGroups[filters.location] || [];
@@ -142,10 +146,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-100">
-
-      {/* ---------- MAIN LAYOUT WRAPPER ---------- */}
       <div className="flex flex-1 overflow-x-hidden relative">
-
         {/* ---------- Desktop Sidebar ---------- */}
         <div className="hidden md:block">
           <TurbineSidebar
@@ -182,7 +183,6 @@ export default function Dashboard() {
             className={`fixed inset-0 z-[200] transform transition-transform duration-300 
               ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
           >
-            {/* Sidebar panel */}
             <div className="absolute left-0 top-0 h-full w-72 bg-white shadow-xl overflow-y-auto z-[210]">
               <TurbineSidebar
                 turbines={turbines}
@@ -211,16 +211,11 @@ export default function Dashboard() {
                 dateError={dateError}
               />
             </div>
-
-            {/* Dark overlay */}
-            <div
-              className="absolute inset-0 bg-black bg-opacity-40 z-[205]"
-              onClick={() => setMobileOpen(false)}
-            />
+            <div className="absolute inset-0 bg-black bg-opacity-40 z-[205]" onClick={() => setMobileOpen(false)} />
           </div>
         )}
 
-        {/* ---------- MAIN DASHBOARD CONTENT ---------- */}
+        {/* ---------- Main Dashboard Content ---------- */}
         <div className="flex-1 flex flex-col transition-all duration-300 overflow-x-hidden">
           <div className="relative z-[50]">
             <DashboardHeader
@@ -252,7 +247,6 @@ export default function Dashboard() {
                 loading={loading}
                 error={error}
               />
-
               <TotalMWh
                 totalMWh={totalMWh}
                 loading={loading}
@@ -260,13 +254,11 @@ export default function Dashboard() {
                 turbines={visibleTurbines}
                 filters={filters}
               />
-
               <ForecastByLocationChart
                 turbines={visibleTurbines}
                 locationGroups={locationGroups}
                 loading={loading}
               />
-
               <LowestPerformingTurbine
                 turbines={isBackendToday ? visibleTurbines : []}
                 backendTurbine={isBackendToday ? null : lowestTurbine}
@@ -277,7 +269,15 @@ export default function Dashboard() {
 
             <TurbinesAtRisk />
 
-            <DashboardLineChart turbines={visibleTurbines} filters={filters} />
+            {/* ---------- Dashboard Line Chart ---------- */}
+            <DashboardLineChart
+              turbines={visibleTurbines}
+              filters={filters}
+              lineChart={lineChart}
+              lineChartPerTurbine={lineChartPerTurbine} // ✅ new prop
+              showPerTurbine={showPerTurbine} // ✅ toggle
+              setShowPerTurbine={setShowPerTurbine} // ✅ toggle handler
+            />
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               <ForecastTable turbines={visibleTurbines} deviceMap={deviceMap} filters={filters} />
@@ -287,7 +287,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ---------- FOOTER ---------- */}
+      {/* ---------- Footer ---------- */}
       <footer className="bg-slate-200 py-3 text-center text-gray-600 text-sm border-t w-full">
         © {new Date().getFullYear()} Aqualectra | Wind Data Monitoring
       </footer>
