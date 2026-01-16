@@ -18,6 +18,19 @@ const FORECAST_HOURS = 3; // predict next 3 hours
 const STOPPED_THRESHOLD = 1; // if last measurements are ≤ this, turbine considered stopped
 const STOPPED_CHECK_POINTS = 3; // last n points to check for stoppage
 
+// ------------------ Retry helper -------------------
+async function fetchWithRetry(fn, retries = 3, delayMs = 1000) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === retries) throw err;
+      console.log(`Fetch failed, retrying in ${delayMs}ms...`, err.message);
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+}
+
 // ----------------------------------------------------
 // Fetch actual + forecast and merge
 // ----------------------------------------------------
@@ -102,30 +115,23 @@ function analyzeRisk(data) {
     return null;
   }
 
-  // Deviations: measurement minus forecast
   const deviations = data.map((d) => d.measurement - d.forecastNext10Min);
-
-  // Only consider negative deviations for risk
   const negativeDevs = deviations.map((d) => Math.min(0, d));
   const lastDeviation = negativeDevs[negativeDevs.length - 1];
 
-  // If turbine is performing at or above forecast, skip
   if (lastDeviation >= 0) return null;
 
   const slope = computeSlope(negativeDevs);
   const volatility = computeStdDev(negativeDevs);
 
-  // Predict next deviations
   const futureDevs = forecastNext(negativeDevs, FORECAST_HOURS);
   const futureRisk = futureDevs.some((d) => d < LAST_DEVIATION_THRESHOLD);
 
   const last3Neg = negativeDevs.slice(-3).every((d) => d < 0);
 
-  // ---------------- Stopped turbine check ----------------
   const lastPoints = data.slice(-STOPPED_CHECK_POINTS);
   const stopped = lastPoints.every((d) => d.measurement <= STOPPED_THRESHOLD);
 
-  // STRICT condition including forecast
   const isRisk =
     futureRisk ||
     ((lastDeviation < LAST_DEVIATION_THRESHOLD && slope < SLOPE_THRESHOLD && last3Neg) ||
@@ -134,12 +140,9 @@ function analyzeRisk(data) {
 
   if (!isRisk) return null;
 
-  // -----------------------------------
-  // Severity level
-  // -----------------------------------
   let severity = "low";
   if (stopped) {
-    severity = "stopped"; // special severity
+    severity = "stopped";
   } else if (
     lastDeviation < LAST_DEVIATION_THRESHOLD * 2 ||
     slope < SLOPE_THRESHOLD * 2 ||
@@ -150,9 +153,6 @@ function analyzeRisk(data) {
     severity = "medium";
   }
 
-  // -----------------------------------
-  // Reasoning text
-  // -----------------------------------
   const reasoning = stopped
     ? "Turbine has stopped generating."
     : `Detected underperformance: last deviation ${lastDeviation.toFixed(
@@ -174,7 +174,7 @@ function analyzeRisk(data) {
 }
 
 // ----------------------------------------------------
-// Endpoint — fully parallel with forecasting, return names
+// Endpoint — sequential + retry + partial results
 // ----------------------------------------------------
 router.get("/turbines-risk", async (req, res) => {
   try {
@@ -184,23 +184,26 @@ router.get("/turbines-risk", async (req, res) => {
 
     console.log("\nStarting STRICT risk analysis with forecasting…");
 
-    const promises = turbineDeviceIds.map(async (turbineId) => {
+    const results = [];
+
+    for (const turbineId of turbineDeviceIds) {
       console.log(`Checking turbine ${turbineId}...`);
+      try {
+        const data = await fetchWithRetry(() => fetchTurbineData(turbineId, start, end, "hourly"));
+        if (!data.length) continue;
 
-      const data = await fetchTurbineData(turbineId, start, end, "hourly");
-      if (!data.length) return null;
+        const risk = analyzeRisk(data);
+        if (!risk) continue;
 
-      const risk = analyzeRisk(data);
-      if (!risk) return null;
-
-      return {
-        turbineId,
-        name: turbineDeviceMap[turbineId] || `Turbine ${turbineId}`,
-        ...risk,
-      };
-    });
-
-    const results = (await Promise.all(promises)).filter(Boolean);
+        results.push({
+          turbineId,
+          name: turbineDeviceMap[turbineId] || `Turbine ${turbineId}`,
+          ...risk,
+        });
+      } catch (err) {
+        console.error(`Failed turbine ${turbineId}:`, err.message);
+      }
+    }
 
     console.log("\nFinal Strict Risk Results:", results);
     res.json({ turbinesAtRisk: results });
