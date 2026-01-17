@@ -23,18 +23,6 @@ ChartJS.register(
   TimeScale
 );
 
-function getAggregationKey(ts, rangeMs) {
-  const date = new Date(ts);
-  if (rangeMs <= 24 * 60 * 60 * 1000) return date.getHours();
-  if (rangeMs <= 7 * 24 * 60 * 60 * 1000) return date.toLocaleDateString("en-CA");
-  if (rangeMs <= 30 * 24 * 60 * 60 * 1000) {
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay());
-    return startOfWeek.toLocaleDateString("en-CA");
-  }
-  return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
-}
-
 export default function DashboardLineChart({
   filters,
   lineChart,
@@ -58,11 +46,15 @@ export default function DashboardLineChart({
   const rangeMs = endDate - startDate;
   const isOneDayRange = rangeMs <= 24 * 60 * 60 * 1000;
 
+  // ---------------- Build datasets ----------------
   const datasets = useMemo(() => {
     if (!chartData) return [];
 
+    const labels = chartData.labels || [];
+
     if (!showPerTurbine) {
-      const filtered = chartData.labels
+      // Aggregated chart
+      const filtered = labels
         .map((ts, i) => ({
           ts: new Date(ts),
           live: chartData.live[i],
@@ -73,6 +65,7 @@ export default function DashboardLineChart({
       const livePoints = filtered
         .filter((p) => p.live != null)
         .map((p) => ({ x: p.ts, y: p.live }));
+
       const forecastPoints = filtered
         .filter((p) => p.forecast != null)
         .map((p) => ({ x: p.ts, y: p.forecast }));
@@ -129,13 +122,24 @@ export default function DashboardLineChart({
         },
       ];
     } else {
-      const labels = chartData.labels || [];
+      // ---------------- Per-turbine chart ----------------
       return Object.entries(chartData.turbines || {}).map(([tId, series], idx) => {
         const livePoints = series.live
-          .map((val, i) => (val != null ? { x: new Date(labels[i]), y: val } : null))
+          .map((val, i) => {
+            if (val == null) return null;
+            const ts = new Date(labels[i]);
+            if (ts < startDate || ts > endDate) return null;
+            return { x: ts, y: val };
+          })
           .filter(Boolean);
+
         const forecastPoints = series.forecast
-          .map((val, i) => (val != null ? { x: new Date(labels[i]), y: val } : null))
+          .map((val, i) => {
+            if (val == null) return null;
+            const ts = new Date(labels[i]);
+            if (ts < startDate || ts > endDate) return null;
+            return { x: ts, y: val };
+          })
           .filter(Boolean);
 
         const colorHue = (idx * 50) % 360;
@@ -172,6 +176,14 @@ export default function DashboardLineChart({
 
   const data = { datasets };
 
+  // ---------------- Chart options with dynamic resolution ----------------
+  let timeUnit;
+  if (rangeMs <= 7 * 24 * 60 * 60 * 1000) timeUnit = "hour";
+  else if (rangeMs <= 30 * 24 * 60 * 60 * 1000) timeUnit = "day";
+  else if (rangeMs <= 180 * 24 * 60 * 60 * 1000) timeUnit = "week";
+  else if (rangeMs <= 730 * 24 * 60 * 60 * 1000) timeUnit = "month";
+  else timeUnit = "year";
+
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -191,14 +203,8 @@ export default function DashboardLineChart({
       x: {
         type: "time",
         time: {
-          unit: isOneDayRange
-            ? "hour"
-            : rangeMs <= 7 * 24 * 60 * 60 * 1000
-            ? "day"
-            : rangeMs <= 30 * 24 * 60 * 60 * 1000
-            ? "week"
-            : "month",
-          tooltipFormat: isOneDayRange ? "HH:mm" : "yyyy-MM-dd",
+          unit: timeUnit,
+          tooltipFormat: timeUnit === "hour" ? "HH:mm" : "yyyy-MM-dd",
         },
         min: startDate,
         max: endDate,
@@ -219,29 +225,15 @@ export default function DashboardLineChart({
     <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-semibold text-lg">{showPerTurbine ? "Per-Turbine Chart" : "Aggregated Chart"}</h2>
-
-        {/* Fixed Toggle Switch */}
         <div className="flex items-center space-x-3">
-          <span className={`text-sm font-medium ${!showPerTurbine ? "text-gray-800" : "text-gray-400"}`}>
-            Aggregated
-          </span>
-
+          <span className={`text-sm font-medium ${!showPerTurbine ? "text-gray-800" : "text-gray-400"}`}>Aggregated</span>
           <div
-            className={`relative w-14 h-8 bg-gray-300 rounded-full cursor-pointer transition-all duration-300 ${
-              showPerTurbine ? "bg-indigo-600" : "bg-gray-300"
-            }`}
+            className={`relative w-14 h-8 rounded-full cursor-pointer transition-all duration-300 ${showPerTurbine ? "bg-indigo-600" : "bg-gray-300"}`}
             onClick={() => setShowPerTurbine(!showPerTurbine)}
           >
-            <span
-              className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
-                showPerTurbine ? "translate-x-6" : "translate-x-0"
-              }`}
-            />
+            <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${showPerTurbine ? "translate-x-6" : "translate-x-0"}`} />
           </div>
-
-          <span className={`text-sm font-medium ${showPerTurbine ? "text-gray-800" : "text-gray-400"}`}>
-            Per-Turbine
-          </span>
+          <span className={`text-sm font-medium ${showPerTurbine ? "text-gray-800" : "text-gray-400"}`}>Per-Turbine</span>
         </div>
       </div>
 

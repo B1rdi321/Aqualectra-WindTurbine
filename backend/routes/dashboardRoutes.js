@@ -57,6 +57,18 @@ function getLocationNameForId(aggregateId) {
   return "";
 }
 
+// ---------------- Determine resolution based on date range ----------------
+function getResolution(startDate, endDate) {
+  const diffMs = endDate - startDate;
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  if (diffDays <= 7) return "hourly";
+  if (diffDays <= 30) return "daily";
+  if (diffDays <= 180) return "weekly"; // 1–6 months
+  if (diffDays <= 730) return "monthly"; // 6–24 months
+  return "yearly"; // >2 years
+}
+
 // ---------------- Backend Route ----------------
 router.get("/", async (req, res) => {
   try {
@@ -109,9 +121,13 @@ router.get("/", async (req, res) => {
       });
     }
 
-    // ---------------- Build URLs ----------------
+    // ---------------- Compute resolution and useUtc ----------------
+    const resolution = getResolution(startOfDay, endOfDay);
+    const useUtc = resolution === "hourly"; // only hourly supports UTC
+
     const deviceQuery = activeIdsForData.join(",");
 
+    // ---------------- Build URLs ----------------
     const liveUrl = `${process.env.BASE_URL}/realtimedata?deviceIds=${deviceQuery}&dataSignalIds=5&aggregate=device&aggregateLevel=0&calculation=sum`;
     const forecastUrlBase = `${process.env.BASE_URL}/data?deviceIds=${deviceQuery}&dataSignalIds=838`;
     const realtimeUrl = `${process.env.BASE_URL}/realtimedata?deviceIds=${deviceQuery}&dataSignalIds=5&aggregate=site&aggregateLevel=0&calculation=sum`;
@@ -138,26 +154,34 @@ router.get("/", async (req, res) => {
 
     const fullForecastUrl =
       `${forecastUrlBase}&timestampStart=${startOfDay.toISOString()}` +
-      `&timestampEnd=${endOfDay.toISOString()}&useUtc=true&aggregate=device&aggregateLevel=0&calculation=sum&resolution=hourly`;
+      `&timestampEnd=${endOfDay.toISOString()}` +
+      `&useUtc=true&aggregate=device&aggregateLevel=0&calculation=sum&resolution=hourly`;
 
     const lineChartUrl =
       `${process.env.BASE_URL}/data?deviceIds=${deviceQuery}&dataSignalIds=5,838` +
       `&timestampStart=${startOfDay.toISOString()}&timestampEnd=${endOfDay.toISOString()}` +
-      `&useUtc=true&aggregate=site&aggregateLevel=0&calculation=sum&resolution=hourly`;
+      `&aggregate=site&aggregateLevel=0&calculation=sum&resolution=${resolution}` +
+      (useUtc ? "&useUtc=true" : ""); // only append if hourly
+
+    const perTurbineLineChartUrl =
+      `${process.env.BASE_URL}/data?deviceIds=${deviceQuery}&dataSignalIds=5,838` +
+      `&timestampStart=${startOfDay.toISOString()}&timestampEnd=${endOfDay.toISOString()}` +
+      `&aggregate=device&aggregateLevel=0&calculation=sum&resolution=${resolution}` +
+      (useUtc ? "&useUtc=true" : "");
 
     const totalMWhUrl =
       `${process.env.BASE_URL}/data?deviceIds=${deviceQuery}&dataSignalIds=5` +
-      `&timestampStart=${startOfDay.toISOString()}` +
-      `&timestampEnd=${endOfDay.toISOString()}` +
-      `&useUtc=true&aggregate=device&aggregateLevel=0&calculation=sum&resolution=0`;
+      `&timestampStart=${startOfDay.toISOString()}&timestampEnd=${endOfDay.toISOString()}` +
+      `&useUtc=${useUtc}&aggregate=device&aggregateLevel=0&calculation=sum&resolution=0`;
 
     // ---------------- Fetch data ----------------
-    const [liveDataRaw, rawForecast, fullForecast, rawLineData, realtimeData, totalRaw] =
+    const [liveDataRaw, rawForecast, fullForecast, rawLineData, rawPerTurbineLineData, realtimeData, totalRaw] =
       await Promise.all([
         fetchWithRetry(liveUrl, { headers }).catch(() => []),
         fetchWithRetry(forecastUrl, { headers }).catch(() => []),
         fetchWithRetry(fullForecastUrl, { headers }).catch(() => []),
         fetchWithRetry(lineChartUrl, { headers }).catch(() => []),
+        fetchWithRetry(perTurbineLineChartUrl, { headers }).catch(() => []),
         fetchWithRetry(realtimeUrl, { headers }).catch(() => []),
         fetchWithRetry(totalMWhUrl, { headers }).catch(() => []),
       ]);
@@ -235,64 +259,78 @@ router.get("/", async (req, res) => {
     const forecastNightMWh = forecastNightKWh / 1000;
 
     // ---------------- Line chart (aggregated) ----------------
-    const hourlyLabels = [], liveDataArray = [], forecastDataArray = [];
-    let lastLiveIndex = -1;
+    let labels = [];
+    let liveDataArray = [];
+    let forecastDataArray = [];
 
-    for (let t = new Date(startOfDay); t <= endOfDay; t.setUTCHours(t.getUTCHours() + 1)) {
-      hourlyLabels.push(new Date(t).toISOString());
-      liveDataArray.push(null);
-      forecastDataArray.push(0);
-    }
-
-    (Array.isArray(rawLineData) ? rawLineData : []).forEach((device) => {
-      if (!device.data || !device.dataSignal) return;
-
-      const isLive = device.dataSignal.dataSignalId === 5;
-      const isForecast = device.dataSignal.dataSignalId === 838;
-
-      Object.entries(device.data).forEach(([ts, val]) => {
-        if (val == null) return;
-        const hourIndex = Math.floor((new Date(ts) - startOfDay) / (1000 * 60 * 60));
-
-        if (hourIndex >= 0 && hourIndex < hourlyLabels.length) {
-          if (isLive) {
-            liveDataArray[hourIndex] = (liveDataArray[hourIndex] || 0) + val;
-            lastLiveIndex = Math.max(lastLiveIndex, hourIndex);
-          }
-          if (isForecast) forecastDataArray[hourIndex] += val;
-        }
+    // --- FIX: Use API returned timestamps directly for non-hourly ---
+    if (["weekly", "monthly", "yearly"].includes(resolution) && Array.isArray(rawLineData) && rawLineData.length > 0) {
+      const tsSet = new Set();
+      rawLineData.forEach((device) => {
+        if (!device?.data) return;
+        Object.keys(device.data).forEach((ts) => tsSet.add(ts));
       });
-    });
+      labels = Array.from(tsSet).sort((a,b)=> new Date(a)-new Date(b));
 
-    for (let i = lastLiveIndex + 1; i < liveDataArray.length; i++) {
-      liveDataArray[i] = null;
+      liveDataArray = labels.map(lbl => {
+        let sum = 0;
+        rawLineData.forEach(device => {
+          if (device.dataSignal.dataSignalId === 5) sum += device.data[lbl] || 0;
+        });
+        return sum || null;
+      });
+
+      forecastDataArray = labels.map(lbl => {
+        let sum = 0;
+        rawLineData.forEach(device => {
+          if (device.dataSignal.dataSignalId === 838) sum += device.data[lbl] || 0;
+        });
+        return sum;
+      });
+    } else {
+      // hourly/daily: old incremental approach
+      let current = new Date(startOfDay);
+      while (current <= endOfDay) {
+        labels.push(new Date(current).toISOString());
+        liveDataArray.push(null);
+        forecastDataArray.push(0);
+
+        switch (resolution) {
+          case "hourly":
+            current.setHours(current.getHours() + 1);
+            break;
+          case "daily":
+            current.setDate(current.getDate() + 1);
+            break;
+        }
+      }
+
+      (Array.isArray(rawLineData) ? rawLineData : []).forEach((device) => {
+        if (!device.data || !device.dataSignal) return;
+        const isLive = device.dataSignal.dataSignalId === 5;
+        const isForecast = device.dataSignal.dataSignalId === 838;
+
+        Object.entries(device.data).forEach(([ts, val]) => {
+          if (val == null) return;
+          const index = labels.findIndex(lbl => new Date(lbl).getTime() === new Date(ts).getTime());
+          if (index === -1) return;
+          if (isLive) liveDataArray[index] = (liveDataArray[index] || 0) + val;
+          if (isForecast) forecastDataArray[index] += val;
+        });
+      });
     }
 
     // ---------------- Per-turbine line chart ----------------
     const perTurbineSeries = {};
     activeIdsForData.forEach((id) => {
       perTurbineSeries[id] = {
-        live: Array(hourlyLabels.length).fill(null),
-        forecast: Array(hourlyLabels.length).fill(0),
+        live: Array(labels.length).fill(null),
+        forecast: Array(labels.length).fill(0),
       };
     });
 
-    const perTurbineLineChartUrl =
-      `${process.env.BASE_URL}/data?deviceIds=${deviceQuery}&dataSignalIds=5,838` +
-      `&timestampStart=${startOfDay.toISOString()}` +
-      `&timestampEnd=${endOfDay.toISOString()}` +
-      `&useUtc=true&aggregate=device&aggregateLevel=0&calculation=sum&resolution=hourly`;
-
-    let rawPerTurbineLineData = [];
-    try {
-      rawPerTurbineLineData = await fetchWithRetry(perTurbineLineChartUrl, { headers }).catch(() => []);
-    } catch (err) {
-      console.warn("Per-turbine line chart fetch failed:", err?.message ?? err);
-    }
-
-    (rawPerTurbineLineData || []).forEach((device) => {
+    (Array.isArray(rawPerTurbineLineData) ? rawPerTurbineLineData : []).forEach((device) => {
       if (!device?.data || !device?.dataSignal) return;
-
       const turbineId = device.aggregateId;
       if (!perTurbineSeries[turbineId]) return;
 
@@ -301,16 +339,17 @@ router.get("/", async (req, res) => {
 
       Object.entries(device.data).forEach(([ts, val]) => {
         if (val == null) return;
-        const hourIndex = Math.floor((new Date(ts) - startOfDay) / (1000 * 60 * 60));
-        if (hourIndex < 0 || hourIndex >= hourlyLabels.length) return;
+        const index = labels.findIndex((lbl) => new Date(lbl).getTime() === new Date(ts).getTime());
+        if (index === -1) return;
 
-        if (isLive) perTurbineSeries[turbineId].live[hourIndex] = val;
-        if (isForecast) perTurbineSeries[turbineId].forecast[hourIndex] += val;
+        if (isLive) perTurbineSeries[turbineId].live[index] = val;
+        if (isForecast) perTurbineSeries[turbineId].forecast[index] += val;
       });
     });
 
     // ---------------- Realtime ----------------
-    let realtimeValue = 0, realtimeTimestamp = null;
+    let realtimeValue = 0,
+      realtimeTimestamp = null;
     (Array.isArray(realtimeData) ? realtimeData : []).forEach((item) => {
       if (!item?.data) return;
       const entries = Object.entries(item.data);
@@ -326,10 +365,7 @@ router.get("/", async (req, res) => {
       (sum, t) =>
         sum +
         (t.data
-          ? Object.values(t.data).reduce(
-              (a, v) => a + (v || 0) * INTERVAL_HOURS,
-              0
-            )
+          ? Object.values(t.data).reduce((a, v) => a + (v || 0) * INTERVAL_HOURS, 0)
           : 0),
       0
     );
@@ -397,12 +433,12 @@ router.get("/", async (req, res) => {
       forecastDayMWh,
       forecastNightMWh,
       lineChart: {
-        labels: hourlyLabels,
+        labels,
         live: liveDataArray,
         forecast: forecastDataArray,
       },
       lineChartPerTurbine: {
-        labels: hourlyLabels,
+        labels,
         turbines: perTurbineSeries,
       },
       realtime: { timestamp: realtimeTimestamp, value: realtimeValue },
