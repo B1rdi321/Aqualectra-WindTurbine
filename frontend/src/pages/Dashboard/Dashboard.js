@@ -239,6 +239,18 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* ---------- Dashboard Line Chart ---------- */}
+            <DashboardLineChart
+              turbines={visibleTurbines}
+              filters={filters}
+              lineChart={lineChart}
+              lineChartPerTurbine={lineChartPerTurbine} // ✅ new prop
+              showPerTurbine={showPerTurbine} // ✅ toggle
+              setShowPerTurbine={setShowPerTurbine} // ✅ toggle handler
+            />
+
+            
+
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               <ForecastDayNightChart
                 forecastDayMWh={forecastDayMWh}
@@ -268,16 +280,6 @@ export default function Dashboard() {
             </div>
 
             <TurbinesAtRisk />
-
-            {/* ---------- Dashboard Line Chart ---------- */}
-            <DashboardLineChart
-              turbines={visibleTurbines}
-              filters={filters}
-              lineChart={lineChart}
-              lineChartPerTurbine={lineChartPerTurbine} // ✅ new prop
-              showPerTurbine={showPerTurbine} // ✅ toggle
-              setShowPerTurbine={setShowPerTurbine} // ✅ toggle handler
-            />
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               <ForecastTable turbines={visibleTurbines} deviceMap={deviceMap} filters={filters} />
