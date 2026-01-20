@@ -39,8 +39,11 @@ export default function RealtimeTable({ turbines = [], deviceMap = {}, loading }
                       {deviceMap[t.aggregateId] || t.aggregateId}
                     </td>
                     <td className="px-4 py-2 flex items-center gap-1 font-semibold text-sm">
-                      {t.measurement == null && <FiAlertTriangle className="text-red-500" />}
-                      {t.measurement >= (t.capacity || 2000) * 0.9 && <FiZap className="text-green-500" />}
+                      {/* Zap if >= 90% of forecast (or fallback to capacity) */}
+                      {((t.forecastNext10Min != null && t.measurement >= t.forecastNext10Min * 0.9) ||
+                        (t.forecastNext10Min == null && t.measurement >= (t.capacity || 2000) * 0.9)) && (
+                        <FiZap className="text-green-500" />
+                      )}
                       {t.measurement?.toFixed(2) ?? "N/A"}
                     </td>
                     <td className="px-4 py-2 text-gray-600 text-sm">
