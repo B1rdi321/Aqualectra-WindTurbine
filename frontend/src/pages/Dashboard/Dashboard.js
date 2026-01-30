@@ -9,6 +9,7 @@ import LowestPerformingTurbine from "./components/LowestPerformingTurbine";
 import DashboardLineChart from "./components/DashboardLineChart";
 import ForecastTable from "./components/ForecastTable";
 import RealtimeTable from "./components/RealtimeTable";
+import RealtimeTotalMW from "./components/RealtimeTotalMW";
 import TurbinesAtRisk from "./components/TurbinesAtRisk";
 import useDashboardData from "./hooks/useDashboardData";
 import { parseYMDToLocalStart, parseYMDToLocalEnd } from "../../utils/dateUtils";
@@ -279,6 +280,10 @@ export default function Dashboard() {
               />
             </div>
 
+            <RealtimeTotalMW
+              turbines={visibleTurbines}
+              loading={loading}
+            />
             <TurbinesAtRisk />
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
