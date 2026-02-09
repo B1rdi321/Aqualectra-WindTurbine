@@ -18,7 +18,6 @@ const PORT = 5000;
 app.use(cors());
 app.use(express.json());
 
-// Existing turbines endpoint (keep as is)
 app.get("/api/greenbyte/turbines", async (req, res) => {
   try {
     const response = await fetch(
@@ -45,10 +44,8 @@ app.get("/api/greenbyte/turbines", async (req, res) => {
   }
 });
 
-// Device map route
 app.use("/api/greenbyte/turbines/devices", deviceRoutes);
 
-// ✅ New route: per-turbine details (realtime + forecast)
 app.use("/api/greenbyte/turbines", turbineDataRoutes);
 
 app.use("/api", turbineRiskRouter);

@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import Logo from "../assets/Aqualectra_logo.png"; // OPTIONAL LOGO
+import Logo from "../assets/Aqualectra_logo.png"; 
 
 /* ------------------------------------------------------
  * Helper: Draws a full-width blue header banner
@@ -18,7 +18,6 @@ function drawHeaderBanner(doc, title) {
   doc.setTextColor(255);
   doc.text(title, 14, 20);
 
-  // Optional logo
   try {
     doc.addImage(Logo, "PNG", width - 45, 5, 35, 20);
   } catch {}

@@ -3,7 +3,7 @@ import React from "react";
 export default function SelectedTimeSummary({ selectedTime, selectedForecast, selectedRealtime }) {
   const formatValue = (val) => {
     if (val === null || val === undefined || val === "—") return "—";
-    return Number(val).toFixed(2); // 2 decimal, change to 1 if you prefer
+    return Number(val).toFixed(2); 
   };
 
   return (

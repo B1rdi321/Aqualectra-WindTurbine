@@ -16,7 +16,7 @@ export default function TurbinesAtRiskCard() {
   const [turbines, setTurbines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openTurbine, setOpenTurbine] = useState(null);
-  const [collapsed, setCollapsed] = useState(true); // Collapsed by default
+  const [collapsed, setCollapsed] = useState(true); 
 
   useEffect(() => {
     const fetchTurbines = async () => {

@@ -11,7 +11,7 @@ const getDayNight = (timestamp) => {
 
 const isTodayLocal = (selectedDateStr) => {
   if (!selectedDateStr) return true;
-  const localNow = new Date(); // Server is already in local time
+  const localNow = new Date(); 
   const [y, m, d] = selectedDateStr.split("-").map(Number);
   const localSelected = new Date(y, m - 1, d);
 
@@ -45,7 +45,7 @@ async function fetchWithRetry(url, options = {}, retries = 2, delay = 500) {
 router.get("/:id/details", async (req, res) => {
   const deviceId = req.params.id;
   const selectedDate = req.query.date;
-  const frontendTimestamp = req.query.timestamp; // log timestamp from frontend
+  const frontendTimestamp = req.query.timestamp; 
   console.log(`📨 Frontend timestamp received: ${frontendTimestamp}`);
 
   try {

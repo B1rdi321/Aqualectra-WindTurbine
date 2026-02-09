@@ -9,10 +9,8 @@ export default function useTurbineData(id, selectedDate) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
 
-  // Keep a ref to track interval so we can clear it properly
   const intervalRef = useRef(null);
 
-  // Determine which date to fetch: parent selectedDate or today if null
   const todayStr = getLocalDateString(new Date());
   const fetchDate = selectedDate ? getLocalDateString(selectedDate) : todayStr;
 

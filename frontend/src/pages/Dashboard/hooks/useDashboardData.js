@@ -19,7 +19,6 @@ export default function useDashboardData(filters) {
   const [lineChart, setLineChart] = useState({ labels: [], live: [], forecast: [], realtime: null });
   const lastLineChartRef = useRef({ labels: [], live: [], forecast: [], realtime: null });
 
-  // ✅ New state for per-turbine line chart
   const [lineChartPerTurbine, setLineChartPerTurbine] = useState({ labels: [], turbines: {} });
   const lastLineChartPerTurbineRef = useRef({ labels: [], turbines: {} });
 
@@ -182,7 +181,7 @@ export default function useDashboardData(filters) {
     forecastDayMWh,
     forecastNightMWh,
     lineChart,
-    lineChartPerTurbine, // ✅ new
+    lineChartPerTurbine,
     totalMWh,
     lowestTurbine,
     allTimeLowestTurbine,

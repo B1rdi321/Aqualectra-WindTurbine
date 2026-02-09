@@ -6,7 +6,6 @@ import L from "leaflet";
 import MapHeader from "./MapHeader";
 import customPin from "../../assets/wind-power.png";
 
-// Fix default Leaflet marker icons in React
 delete L.Icon.Default.prototype._getIconUrl;
 
 const customIcon = new L.Icon({

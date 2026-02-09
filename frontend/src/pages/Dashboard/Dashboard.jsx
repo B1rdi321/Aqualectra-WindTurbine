@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [selectedTurbines, setSelectedTurbines] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [showPerTurbine, setShowPerTurbine] = useState(false); // ✅ toggle
+  const [showPerTurbine, setShowPerTurbine] = useState(false); 
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -52,7 +52,7 @@ export default function Dashboard() {
     forecastDayMWh,
     forecastNightMWh,
     lineChart,
-    lineChartPerTurbine, // ✅ new
+    lineChartPerTurbine,
   } = dashboardData;
 
   // ---------- Sync backend day ----------
@@ -240,17 +240,16 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* ---------- Dashboard Line Chart ---------- */}
+            <TurbinesAtRisk />
+            
             <DashboardLineChart
               turbines={visibleTurbines}
               filters={filters}
               lineChart={lineChart}
-              lineChartPerTurbine={lineChartPerTurbine} // ✅ new prop
-              showPerTurbine={showPerTurbine} // ✅ toggle
-              setShowPerTurbine={setShowPerTurbine} // ✅ toggle handler
+              lineChartPerTurbine={lineChartPerTurbine} 
+              showPerTurbine={showPerTurbine} 
+              setShowPerTurbine={setShowPerTurbine} 
             />
-
-            
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               <ForecastDayNightChart
@@ -284,7 +283,6 @@ export default function Dashboard() {
               turbines={visibleTurbines}
               loading={loading}
             />
-            <TurbinesAtRisk />
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               <ForecastTable turbines={visibleTurbines} deviceMap={deviceMap} filters={filters} />

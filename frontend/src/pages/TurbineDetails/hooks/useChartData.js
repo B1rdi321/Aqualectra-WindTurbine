@@ -34,7 +34,7 @@ export default function useChartData(details, selectedTimeIndex) {
     });
 
     return {
-      labels: allTimestamps, // keep as Date objects
+      labels: allTimestamps, 
       datasets: [
         {
           label: "Forecast",
@@ -98,7 +98,7 @@ export default function useChartData(details, selectedTimeIndex) {
             displayFormats: { minute: "HH:mm" },
           },
           ticks: {
-            stepSize: 30, // <-- force 30-minute intervals
+            stepSize: 30, 
             source: "auto",
             autoSkip: true,
           },

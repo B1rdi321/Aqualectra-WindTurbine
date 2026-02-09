@@ -18,10 +18,10 @@ export default function TurbineDetails() {
   const navigate = useNavigate();
   const chartRef = useRef(null);
 
-  const [selectedDate, setSelectedDate] = useState(null); // initially null
+  const [selectedDate, setSelectedDate] = useState(null); 
   const [selectedTimeIndex, setSelectedTimeIndex] = useState(0);
   const [typedTime, setTypedTime] = useState("");
-  const typingTimeout = useRef(null); // For debounced rounding
+  const typingTimeout = useRef(null); 
 
   const queryParams = new URLSearchParams(location.search);
   const selectedTurbineIds = queryParams.get("selected")?.split(",") || [id];
@@ -104,7 +104,7 @@ export default function TurbineDetails() {
 
         <ForecastDatePicker
           selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate} // user-controlled now
+          setSelectedDate={setSelectedDate} 
         />
 
         {details ? (

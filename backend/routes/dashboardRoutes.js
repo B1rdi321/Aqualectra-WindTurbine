@@ -288,7 +288,6 @@ router.get("/", async (req, res) => {
         return sum;
       });
     } else {
-      // hourly/daily: old incremental approach
       let current = new Date(startOfDay);
       while (current <= endOfDay) {
         labels.push(new Date(current).toISOString());
